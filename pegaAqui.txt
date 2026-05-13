@@ -1,1 +1,270 @@
-pega aqui
+
+Contexto HTML Requerido (ejemplo index.html)
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recetario TypeScript - UD02</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .oculto { display: none; }
+        #seccion-bienvenida { border-bottom: 2px solid #ccc; padding-bottom: 20px; margin-bottom: 20px; }
+        form { display: flex; flex-direction: column; max-width: 300px; gap: 10px; margin-bottom: 20px; }
+        #contenedor-recetas { display: flex; flex-wrap: wrap; gap: 15px; }
+        .tarjeta-receta { border: 1px solid #ddd; padding: 15px; border-radius: 8px; width: 250px; }
+        .color-postre { background-color: #ffcccc; } /* light-red */
+        .color-ensalada { background-color: #ccffcc; } /* light-green */
+        .color-cocina { background-color: #ccccff; } /* light-blue */
+    </style>
+</head>
+<body>
+
+    <!-- Sección de Bienvenida (Punto d) -->
+    <div id="seccion-bienvenida" class="oculto">
+        <h1 id="texto-saludo">Bienvenido, [nombre]</h1>
+    </div>
+
+    <!-- Formulario de Inicio (Puntos a, b, c) -->
+    <form id="form-inicio">
+        <h3>Registro</h3>
+        <input type="text" id="nombre-inicio" placeholder="Nombre">
+        <input type="text" id="apellidos-inicio" placeholder="Apellidos">
+        <div id="error-form-inicio" style="color: red; min-height: 1em;"></div>
+        <button type="submit">Envío</button>
+        <button type="reset">Limpiar formulario</button>
+    </form>
+
+    <!-- Formulario de Creación de Receta (Punto e) -->
+    <form id="form-receta" class="oculto">
+        <h3>Nueva Receta</h3>
+        <input type="text" id="titulo-receta" placeholder="Título">
+        <textarea id="descripcion-receta" placeholder="Descripción"></textarea>
+        <label for="categoria-receta">Categoría:</label>
+        <select id="categoria-receta">
+            <option value="Postres">Postres</option>
+            <option value="Ensalada">Ensalada</option>
+            <option value="Cocina tradicional">Cocina tradicional</option>
+        </select>
+        <div id="error-form-receta" style="color: red; min-height: 1em;"></div>
+        <button type="submit">Añadir Receta</button>
+    </form>
+
+    <button id="btn-limpiar-recetas">Borrar todas las recetas</button>
+
+    <!-- Contenedor de Tarjetas (Puntos f, g) -->
+    <div id="contenedor-recetas">
+        <!-- Aquí se inyectarán las tarjetas -->
+    </div>
+
+    <script src="dist/app.js"></script>
+</body>
+</html>
+
+
+
+
+Solución en TypeScript (ejemplo src/app.ts)
+
+
+
+
+
+// --- 0. Definiciones de Tipos e Interfaces (Estilo de tu repo) ---
+
+type CategoriaReceta = 'Postres' | 'Ensalada' | 'Cocina tradicional';
+
+interface Receta {
+    id: number;
+    titulo: string;
+    descripcion: string;
+    categoria: CategoriaReceta;
+}
+
+// --- 1. Utilidades y Funciones Globales ---
+
+// Función para mostrar errores temporalmente (Punto b)
+const mostrarErrorTemporal = (contenedorId: string, mensaje: string): void => {
+    const errorContainer = document.getElementById(contenedorId);
+    if (!errorContainer) return;
+
+    // Se Inyecta normal (Punto b.ii)
+    errorContainer.innerHTML = mensaje;
+
+    // Función set time out para pintar durante 5 segundos (Punto b.i)
+    setTimeout(() => {
+        // Para limpiar... se utiliza el innerHTML = "" (Punto b.ii)
+        errorContainer.innerHTML = '';
+    }, 5000);
+};
+
+// --- 2. Gestión de Cookies (Punto c) ---
+
+// Se almacenarán en las cookies... utilizando claves "name" y "surname"
+const guardarDatosUsuario = (nombre: string, apellidos: string): void => {
+    document.cookie = `name=${nombre}; path=/;`;
+    document.cookie = `surname=${apellidos}; path=/;`;
+};
+
+const obtenerDatosUsuario = (): { nombre: string; apellidos: string } | null => {
+    const cookies = document.cookie.split(';');
+    let nombre = '';
+    let apellidos = '';
+
+    cookies.forEach(cookie => {
+        const [key, value] = cookie.trim().split('=');
+        if (key === 'name') nombre = value;
+        if (key === 'surname') apellidos = value;
+    });
+
+    if (nombre && apellidos) {
+        return { nombre, apellidos };
+    }
+    return null;
+};
+
+// --- 3. Lógica Principal de la Aplicación ---
+
+// Almacén de recetas en memoria
+let listadoRecetas: Receta[] = [];
+
+// Función para gestionar la visibilidad de las secciones (Punto d)
+const gestionarVisibilidadInicial = (): void => {
+    const datos = obtenerDatosUsuario();
+    const sectionBienvenida = document.getElementById('seccion-bienvenida');
+    const formInicio = document.getElementById('form-inicio');
+    const formReceta = document.getElementById('form-receta');
+    const h1Saludo = document.getElementById('texto-saludo');
+
+    if (datos && sectionBienvenida && formInicio && formReceta && h1Saludo) {
+        // Cuando la cookie exista... formulario [de inicio] debe estar oculto
+        formInicio.classList.add('oculto');
+        sectionBienvenida.classList.remove('oculto');
+        formReceta.classList.remove('oculto');
+        h1Saludo.innerHTML = `Bienvenido ${datos.nombre} ${datos.apellidos}`;
+    }
+};
+
+// Función para crear tarjeta de receta y añadirla al DOM (Punto f, g)
+const renderizarReceta = (receta: Receta): void => {
+    const contenedor = document.getElementById('contenedor-recetas');
+    if (!contenedor) return;
+
+    const tarjeta = document.createElement('div');
+    tarjeta.classList.add('tarjeta-receta');
+
+    // Fondo en función a la categoria (Punto f)
+    // Se usa un switch para determinar la clase CSS
+    let claseFondo = '';
+    switch (receta.categoria) {
+        case 'Postres':
+            claseFondo = 'color-postre'; // i. fondo será rojo (light-red)
+            break;
+        case 'Ensalada':
+            claseFondo = 'color-ensalada'; // ii. fondo será verde claro
+            break;
+        case 'Cocina tradicional':
+            claseFondo = 'color-cocina'; // iii. fondo será azul claro
+            break;
+    }
+    if (claseFondo) tarjeta.classList.add(claseFondo);
+
+    // Contenido de la tarjeta (Punto e, g)
+    // Además... se creará un enlace a la web de google formado por "https://www.google.com/search?q=" + el título
+    tarjeta.innerHTML = `
+        <h4>${receta.titulo}</h4>
+        <p>${receta.descripcion}</p>
+        <p><em>Categoría: ${receta.categoria}</em></p>
+        <a href="https://www.google.com/search?q=${encodeURIComponent(receta.titulo)}" target="_blank">Buscar en Google</a>
+    `;
+
+    contenedor.appendChild(tarjeta);
+};
+
+// --- 4. Event Listeners y Validaciones ---
+
+// a. Formulario de Inicio (Nombre/Apellidos)
+const setupFormInicio = (): void => {
+    const formInicio = document.getElementById('form-inicio') as HTMLFormElement | null;
+    const inputNombre = document.getElementById('nombre-inicio') as HTMLInputElement | null;
+    const inputApellidos = document.getElementById('apellidos-inicio') as HTMLInputElement | null;
+
+    if (!formInicio || !inputNombre || !inputApellidos) return;
+
+    formInicio.addEventListener('submit', (e: Event) => {
+        e.preventDefault();
+
+        // Se validará que los datos introducidos estén rellenos
+        if (!inputNombre.value.trim() || !inputApellidos.value.trim()) {
+            mostrarErrorTemporal('error-form-inicio', 'Error: El nombre y apellidos son obligatorios.');
+            return; // Detiene el envío
+        }
+
+        guardarDatosUsuario(inputNombre.value, inputApellidos.value);
+        gestionarVisibilidadInicial(); // Actualiza la vista
+    });
+};
+
+// e. Formulario de Creación de Receta
+const setupFormReceta = (): void => {
+    const formReceta = document.getElementById('form-receta') as HTMLFormElement | null;
+    const inputTitulo = document.getElementById('titulo-receta') as HTMLInputElement | null;
+    const textareaDesc = document.getElementById('descripcion-receta') as HTMLTextAreaElement | null;
+    const selectCat = document.getElementById('categoria-receta') as HTMLSelectElement | null;
+
+    if (!formReceta || !inputTitulo || !textareaDesc || !selectCat) return;
+
+    formReceta.addEventListener('submit', (e: Event) => {
+        e.preventDefault();
+
+        // Validación simple (como en tu repo)
+        if (!inputTitulo.value.trim() || !textareaDesc.value.trim()) {
+            mostrarErrorTemporal('error-form-receta', 'Error: Título y descripción son necesarios.');
+            return;
+        }
+
+        // Creación del objeto receta (tipado estricto como el repo)
+        const nuevaReceta: Receta = {
+            id: Date.now(), // ID único
+            titulo: inputTitulo.value,
+            descripcion: textareaDesc.value,
+            categoria: selectCat.value as CategoriaReceta // Casteo a tipo de unión
+        };
+
+        listadoRecetas.push(nuevaReceta);
+        renderizarReceta(nuevaReceta); // Inyección en el DOM
+        formReceta.reset(); // Limpia campos
+    });
+};
+
+// h. Botón de limpieza total
+const setupBotonLimpiar = (): void => {
+    const btnLimpiar = document.getElementById('btn-limpiar-recetas');
+    const contenedor = document.getElementById('contenedor-recetas');
+    if (!btnLimpiar || !contenedor) return;
+
+    btnLimpiar.addEventListener('click', () => {
+        // Al pulsarlo elimine todas las recetas
+        listadoRecetas = [];
+        contenedor.innerHTML = '';
+    });
+};
+
+// --- 5. Inicialización ---
+
+// Ejecutar cuando el DOM esté cargado
+document.addEventListener('DOMContentLoaded', () => {
+    gestionarVisibilidadInicial();
+    setupFormInicio();
+    setupFormReceta();
+    setupBotonLimpiar();
+});
+
+
+
+
+
+
+
+
